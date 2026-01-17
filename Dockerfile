@@ -1,4 +1,4 @@
-FROM golang:1.14.1-alpine3.11 as builder
+FROM golang:1.21-alpine as builder
 EXPOSE 8080
 
 ENV CGO_ENABLED=0
