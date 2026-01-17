@@ -4,12 +4,13 @@ import (
 	"html/template"
 	"net/http"
 	"path"
+	"sync/atomic"
 
 	log "github.com/sirupsen/logrus"
 )
 
-var liveness bool
-var readiness bool
+var liveness atomic.Bool
+var readiness atomic.Bool
 
 type Application struct {
 	Liveness  bool
@@ -24,8 +25,8 @@ func main() {
 
 	log.Info("Starting up process")
 
-	liveness = true
-	readiness = true
+	liveness.Store(true)
+	readiness.Store(true)
 
 	http.HandleFunc("/", handleStatus)
 	http.HandleFunc("/healthz", handleHealthz)
@@ -48,14 +49,14 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err = tmpl.Execute(w, Application{Liveness: liveness, Readiness: readiness}); err != nil {
+	if err = tmpl.Execute(w, Application{Liveness: liveness.Load(), Readiness: readiness.Load()}); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func handleHealthz(w http.ResponseWriter, r *http.Request) {
 	log.Info("Handle Liveness ...")
-	if !liveness {
+	if !liveness.Load() {
 		log.Info("Imitate processing problem")
 
 		w.WriteHeader(http.StatusInternalServerError)
@@ -67,7 +68,7 @@ func handleHealthz(w http.ResponseWriter, r *http.Request) {
 
 func handleReadiness(w http.ResponseWriter, r *http.Request) {
 	log.Info("Handle Readiness ...")
-	if !readiness {
+	if !readiness.Load() {
 		log.Info("Imitate processing problem")
 
 		w.WriteHeader(http.StatusInternalServerError)
@@ -79,14 +80,16 @@ func handleReadiness(w http.ResponseWriter, r *http.Request) {
 
 func handleHealthToggle(w http.ResponseWriter, r *http.Request) {
 	log.Info("Handle Toggle ...")
-	liveness = !liveness
+	current := liveness.Load()
+	liveness.Store(!current)
 
 	w.WriteHeader(http.StatusOK)
 }
 
 func handleReadinessToggle(w http.ResponseWriter, r *http.Request) {
 	log.Info("Handle Toggle ...")
-	readiness = !readiness
+	current := readiness.Load()
+	readiness.Store(!current)
 
 	w.WriteHeader(http.StatusOK)
 }
